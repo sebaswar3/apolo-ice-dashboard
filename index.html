@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Mapa de Heladeras - Nivel de Hielo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  html, body { height: 100%; margin: 0; font-family: sans-serif; }
+  #mapa { height: 100%; width: 100%; }
+  .popup-heladera { font-size: 14px; }
+  .popup-heladera b { font-size: 16px; }
+  .estado-ok { color: #2e7d32; font-weight: bold; }
+  .estado-bajo { color: #c62828; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<div id="mapa"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  // URL del Apps Script (la misma que usa el firmware, con ?formato=json)
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzLGqa8ApTi82jhOT64GPeB1FCOf4uc5_RD1fUDpwJx5nRxnwugd-mTP4xkAc1HMQSw1g/exec";
+  const LIMITE_BOLSAS_BAJO = 3;
+
+  const mapa = L.map('mapa').setView([-34.6037, -58.3816], 6); // centrado en Buenos Aires
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(mapa);
+
+  function cargarHeladeras() {
+    fetch(SCRIPT_URL + "?formato=json")
+      .then(function (respuesta) { return respuesta.json(); })
+      .then(function (heladeras) {
+        heladeras.forEach(function (h) {
+          if (!h.lat || !h.lng) return; // sin ubicacion cargada todavia
+
+          const bajo = Number(h.bolsas) <= LIMITE_BOLSAS_BAJO;
+          const color = bajo ? "#c62828" : "#2e7d32";
+
+          const marcador = L.circleMarker([h.lat, h.lng], {
+            radius: 10,
+            color: color,
+            fillColor: color,
+            fillOpacity: 0.8
+          }).addTo(mapa);
+
+          const estadoTexto = bajo
+            ? '<span class="estado-bajo">NIVEL BAJO</span>'
+            : '<span class="estado-ok">OK</span>';
+
+          marcador.bindPopup(
+            '<div class="popup-heladera">' +
+            '<b>' + (h.nombre || h.id) + '</b><br>' +
+            'ID: ' + h.id + '<br>' +
+            'Bolsas restantes: ' + h.bolsas + '<br>' +
+            'Estado: ' + estadoTexto + '<br>' +
+            'Actualizado: ' + h.actualizado +
+            '</div>'
+          );
+        });
+      })
+      .catch(function (error) {
+        console.error("Error cargando heladeras:", error);
+      });
+  }
+
+  cargarHeladeras();
+  setInterval(cargarHeladeras, 60000); // refresca cada 1 minuto
+</script>
+
+</body>
+</html>
